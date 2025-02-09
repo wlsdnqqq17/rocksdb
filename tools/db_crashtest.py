@@ -344,6 +344,7 @@ default_params = {
     "paranoid_memory_checks": lambda: random.choice([0] * 7 + [1]),
     "allow_unprepared_value": lambda: random.choice([0, 1]),
     "track_and_verify_wals": lambda: random.choice([0, 1]),
+    "enable_remote_compaction": lambda: random.choice([0, 1]),
 }
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"
 # If TEST_TMPDIR_EXPECTED is not specified, default value will be TEST_TMPDIR
@@ -813,6 +814,11 @@ def finalize_and_sanitize(src_params):
         dest_params["atomic_flush"] = 1
         dest_params["sync"] = 0
         dest_params["write_fault_one_in"] = 0
+        dest_params["reopen"] = 0
+        dest_params["manual_wal_flush_one_in"] = 0
+        # disableWAL and recycle_log_file_num options are not mutually
+        # compatible at the moment
+        dest_params["recycle_log_file_num"] = 0
     if dest_params.get("open_files", 1) != -1:
         # Compaction TTL and periodic compactions are only compatible
         # with open_files = -1
@@ -968,10 +974,6 @@ def finalize_and_sanitize(src_params):
             # we have a fix that allows auto recovery.
             dest_params["exclude_wal_from_write_fault_injection"] = 1
             dest_params["metadata_write_fault_one_in"] = 0
-    if dest_params.get("disable_wal") == 1:
-        # disableWAL and recycle_log_file_num options are not mutually
-        # compatible at the moment
-        dest_params["recycle_log_file_num"] = 0
     # Enabling block_align with compression is not supported
     if dest_params.get("block_align") == 1:
         dest_params["compression_type"] = "none"
@@ -1018,11 +1020,11 @@ def finalize_and_sanitize(src_params):
         dest_params["use_full_merge_v1"] = 0
         dest_params["enable_pipelined_write"] = 0
         dest_params["use_attribute_group"] = 0
-    # TODO(hx235): Re-enable write fault injections with pessimistic 
-    # transactions after resolving the WAL hole caused by how corrupted 
-    # WAL is handled under 2PC upon WAL write error recovery. 
+    # TODO(hx235): Re-enable write fault injections with pessimistic
+    # transactions after resolving the WAL hole caused by how corrupted
+    # WAL is handled under 2PC upon WAL write error recovery.
     if (
-        dest_params.get("track_and_verify_wals", 0) == 1 
+        dest_params.get("track_and_verify_wals", 0) == 1
         and dest_params.get("use_optimistic_txn") == 0
     ):
         dest_params["metadata_write_fault_one_in"] = 0
@@ -1072,6 +1074,7 @@ def gen_cmd_params(args):
     if (
         not args.test_best_efforts_recovery
         and not args.test_tiered_storage
+        and params.get("test_secondary", 0) == 0
         and random.choice([0] * 9 + [1]) == 1
     ):
         params.update(blob_params)

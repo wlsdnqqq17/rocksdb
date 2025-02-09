@@ -2566,6 +2566,8 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
         // Return all merge operands for get_impl_options.key
         *get_impl_options.number_of_operands =
             static_cast<int>(merge_context.GetNumOperands());
+        // OK status is returned, some merge operand is found.
+        assert(*get_impl_options.number_of_operands > 0);
         if (*get_impl_options.number_of_operands >
             get_impl_options.get_merge_operands_options
                 ->expected_max_number_of_operands) {
@@ -5952,6 +5954,7 @@ Status DBImpl::IngestExternalFiles(
 
     num_running_ingest_file_ += static_cast<int>(num_cfs);
     TEST_SYNC_POINT("DBImpl::IngestExternalFile:AfterIncIngestFileCounter");
+    TEST_SYNC_POINT("DBImpl::IngestExternalFile:AfterIncIngestFileCounter:2");
 
     bool at_least_one_cf_need_flush = false;
     std::vector<bool> need_flush(num_cfs, false);
